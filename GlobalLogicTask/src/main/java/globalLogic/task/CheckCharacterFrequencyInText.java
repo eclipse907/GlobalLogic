@@ -38,8 +38,7 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 		result.getKey().entrySet()
 					   .stream()
 					   .sorted(Comparator.comparingDouble(e -> e.getValue()))
-					   .forEach(e -> {
-						   
+					   .forEach(e -> {						   
 						   try {
 								bw.write("{" + e.getKey().getKey() + ", " + e.getKey().getValue() + "} = " + e.getValue() + "\n");
 						   } catch (IOException ex) {
