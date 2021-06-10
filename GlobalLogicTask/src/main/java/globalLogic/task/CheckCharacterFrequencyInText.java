@@ -5,7 +5,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.AbstractMap.SimpleEntry;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,20 +33,20 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 			throw new NullPointerException("Input and output streams can't be null");
 		}
 		String text = br.lines().collect(Collectors.joining(" "));
-		SimpleEntry<Map<SimpleEntry<Set<Character>, Integer>, Double>, Double> result = calculateCharFrequency(text);
-		result.getKey().entrySet()
+		Result result = calculateCharFrequency(text);
+		result.getCharsWordGroupingFrequency().entrySet()
 					   .stream()
-					   .sorted(Comparator.comparingDouble(e -> e.getValue()))
+					   .sorted(Comparator.comparingDouble(e -> e.getValue().doubleValue()))
 					   .forEach(e -> {						   
 						   try {
-								bw.write("{" + e.getKey().getKey() + ", " + e.getKey().getValue() + "} = " + e.getValue() + "\n");
+								bw.write("{" + e.getKey().getCharsToCheckInWord() + ", " + e.getKey().getWordSize() + "} = " + e.getValue() + "\n");
 						   } catch (IOException ex) {
 								System.out.println("Error while writing result to output stream:\n" + ex.getLocalizedMessage());
 								System.exit(1);
 						   }
 					   });
 		try {
-			bw.write("TOTAL Frequency: " + result.getValue() + "\n");
+			bw.write("TOTAL Frequency: " + result.getTotalCharFrequency() + "\n");
 		} catch (IOException ex) {
 			System.out.println("Error while writing result to output stream:\n" + ex.getLocalizedMessage());
 			System.exit(1);
@@ -64,9 +63,9 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 		return excludedCharacters;
 	}
 	
-	private SimpleEntry<Map<SimpleEntry<Set<Character>, Integer>, Double>, Double> calculateCharFrequency(String text) {
+	private Result calculateCharFrequency(String text) {
 		String[] wordsInText = text.split("[\\s\\n]+");
-		Map<SimpleEntry<Set<Character>, Integer>, Integer> charNumInText = new HashMap<>();
+		Map<CharactersWordSizeGrouping, Integer> charNumInText = new HashMap<>();
 		int totalNumOfCharsToCheckInText = 0;
 		int totalNumOfCharsInText = 0;
 		for (String word : wordsInText) {
@@ -87,21 +86,87 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 			}
 			if (numOfCharsToCheckInWord > 0) {
 				charsToCheckInWord.sort(charactersToCheck.getWordCharacterComparator());
-				SimpleEntry<Set<Character>, Integer> charNumInWord = new SimpleEntry<>(
-						new LinkedHashSet<>(charsToCheckInWord), wordSize
-				);
+				CharactersWordSizeGrouping charNumInWord = new CharactersWordSizeGrouping(new LinkedHashSet<>(charsToCheckInWord), wordSize);
 				charNumInText.put(charNumInWord, charNumInText.getOrDefault(charNumInWord, 0) + numOfCharsToCheckInWord);
 			}
 		}
-		Map<SimpleEntry<Set<Character>, Integer>, Double> charFrequency = new HashMap<>();
-		for (SimpleEntry<Set<Character>, Integer> key : charNumInText.keySet()) {
-			BigDecimal bd = new BigDecimal(charNumInText.get(key).doubleValue() / totalNumOfCharsToCheckInText);
-			bd = bd.setScale(2, RoundingMode.HALF_UP);
-			charFrequency.put(key, bd.doubleValue());
+		Map<CharactersWordSizeGrouping, BigDecimal> charFrequency = new HashMap<>();
+		for (CharactersWordSizeGrouping key : charNumInText.keySet()) {
+			BigDecimal frequency = new BigDecimal(charNumInText.get(key).doubleValue() / totalNumOfCharsToCheckInText);
+			frequency = frequency.setScale(2, RoundingMode.HALF_UP);
+			charFrequency.put(key, frequency);
 		}
-		BigDecimal bd = new BigDecimal((double)totalNumOfCharsToCheckInText / totalNumOfCharsInText);
-		bd = bd.setScale(2, RoundingMode.HALF_UP);
-		return new SimpleEntry<>(charFrequency, bd.doubleValue());
+		BigDecimal totalFrequency = new BigDecimal((double)totalNumOfCharsToCheckInText / totalNumOfCharsInText);
+		totalFrequency = totalFrequency.setScale(2, RoundingMode.HALF_UP);
+		return new Result(charFrequency, totalFrequency);
+	}
+	
+	private static class CharactersWordSizeGrouping {
+		
+		private Set<Character> charsToCheckInWord;
+		private int wordSize;
+		
+		public CharactersWordSizeGrouping(Set<Character> charsToCheckInWord, int wordSize) {
+			this.charsToCheckInWord = charsToCheckInWord;
+			this.wordSize = wordSize;
+		}
+
+		public Set<Character> getCharsToCheckInWord() {
+			return charsToCheckInWord;
+		}
+
+		public Integer getWordSize() {
+			return wordSize;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + ((charsToCheckInWord == null) ? 0 : charsToCheckInWord.hashCode());
+			result = prime * result + wordSize;
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			CharactersWordSizeGrouping other = (CharactersWordSizeGrouping) obj;
+			if (charsToCheckInWord == null) {
+				if (other.charsToCheckInWord != null)
+					return false;
+			} else if (!charsToCheckInWord.equals(other.charsToCheckInWord))
+				return false;
+			if (wordSize != other.wordSize)
+				return false;
+			return true;
+		}
+					
+	}
+	
+	private static class Result {
+		
+		private Map<CharactersWordSizeGrouping, BigDecimal> charsWordGroupingFrequency;
+		private BigDecimal totalCharFrequency;
+		
+		public Result(Map<CharactersWordSizeGrouping, BigDecimal> charsWordGroupingFrequency, BigDecimal totalCharFrequency) {
+			this.charsWordGroupingFrequency = charsWordGroupingFrequency;
+			this.totalCharFrequency = totalCharFrequency;
+		}
+
+		public Map<CharactersWordSizeGrouping, BigDecimal> getCharsWordGroupingFrequency() {
+			return charsWordGroupingFrequency;
+		}
+
+		public BigDecimal getTotalCharFrequency() {
+			return totalCharFrequency;
+		}
+				
 	}
 
 }
