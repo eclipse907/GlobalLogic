@@ -25,28 +25,29 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 		this.charactersToCheck = charactersToCheck;
 		this.excludedCharacters = excludedCharacters;
 	}
+	
 
 	@Override
-	public void displayCharacterFrequencyInText(BufferedReader br, BufferedWriter bw) {
-		if (br == null || bw == null) {
+	public void displayCharacterFrequencyInText(BufferedReader inputTextReader, BufferedWriter outputWriter) {
+		if (inputTextReader == null || outputWriter == null) {
 			throw new NullPointerException("Input and output streams can't be null");
 		}
 		try {
-			Result result = calculateCharFrequency(br);
+			Result result = calculateCharFrequency(inputTextReader);
 			result.getCharsWordGroupingFrequency().entrySet()
 			   .stream()
 			   .sorted(Comparator.comparingDouble(e -> e.getValue().doubleValue()))
 			   .forEach(e -> {
 				try {
-					bw.write("{" + e.getKey().getCharsToCheckInWord() + ", " + e.getKey().getWordSize() + "} = " + e.getValue() + "\n");
+					outputWriter.write("{" + e.getKey().getCharsToCheckInWord() + ", " + e.getKey().getWordSize() + "} = " + e.getValue() + System.lineSeparator());
 				} catch (IOException ex) {
-					System.out.println("Error while writing result to output stream:\n" + ex.getLocalizedMessage());
+					System.out.println("Error while writing result to output stream:" + System.lineSeparator() + ex.getLocalizedMessage());
 					System.exit(1);
 				}
 			});
-			bw.write("TOTAL Frequency: " + result.getTotalCharFrequency() + "\n");
+			outputWriter.write("TOTAL Frequency: " + result.getTotalCharFrequency() + System.lineSeparator());
 		} catch (IOException ex) {
-			System.out.println("Error while reading from input stream or writing to output stream:\n" + ex.getLocalizedMessage());
+			System.out.println("Error while reading from input stream or writing to output stream:" + System.lineSeparator() + ex.getLocalizedMessage());
 			System.exit(1);
 		}
 	}
@@ -62,7 +63,7 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 	}
 	
 	private Result calculateCharFrequency(BufferedReader inputTextReader) throws IOException {
-		Map<CharactersWordSizeGrouping, Integer> charNumInText = new HashMap<>();
+		Map<CharactersWordSizeGrouping, Integer> charNumPerGrouping = new HashMap<>();
 		int totalNumOfCharsToCheckInText = 0;
 		int totalNumOfCharsInText = 0;
 		while (true) {
@@ -89,19 +90,19 @@ public class CheckCharacterFrequencyInText implements ICheckCharacterFrequencyIn
 				if (numOfCharsToCheckInWord > 0) {
 					charsToCheckInWord.sort(charactersToCheck.getWordCharacterComparator());
 					CharactersWordSizeGrouping charNumInWord = new CharactersWordSizeGrouping(new LinkedHashSet<>(charsToCheckInWord), wordSize);
-					charNumInText.put(charNumInWord, charNumInText.getOrDefault(charNumInWord, 0) + numOfCharsToCheckInWord);
+					charNumPerGrouping.put(charNumInWord, charNumPerGrouping.getOrDefault(charNumInWord, 0) + numOfCharsToCheckInWord);
 				}
 			}
 		}
-		Map<CharactersWordSizeGrouping, BigDecimal> charFrequency = new HashMap<>();
-		for (CharactersWordSizeGrouping key : charNumInText.keySet()) {
-			BigDecimal frequency = new BigDecimal(charNumInText.get(key).doubleValue() / totalNumOfCharsToCheckInText);
+		Map<CharactersWordSizeGrouping, BigDecimal> charsWordGroupingFrequency = new HashMap<>();
+		for (CharactersWordSizeGrouping key : charNumPerGrouping.keySet()) {
+			BigDecimal frequency = new BigDecimal(charNumPerGrouping.get(key).doubleValue() / totalNumOfCharsToCheckInText);
 			frequency = frequency.setScale(2, RoundingMode.HALF_UP);
-			charFrequency.put(key, frequency);
+			charsWordGroupingFrequency.put(key, frequency);
 		}
-		BigDecimal totalFrequency = new BigDecimal((double)totalNumOfCharsToCheckInText / totalNumOfCharsInText);
-		totalFrequency = totalFrequency.setScale(2, RoundingMode.HALF_UP);
-		return new Result(charFrequency, totalFrequency);
+		BigDecimal totalCharFrequency = new BigDecimal((double)totalNumOfCharsToCheckInText / totalNumOfCharsInText);
+		totalCharFrequency = totalCharFrequency.setScale(2, RoundingMode.HALF_UP);
+		return new Result(charsWordGroupingFrequency, totalCharFrequency);
 	}
 	
 	private static class CharactersWordSizeGrouping {
